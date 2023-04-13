@@ -4,9 +4,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
-
-
+from datetime import datetime
 from time import sleep
+import os
+import smtplib
 
 
 class Register(object):
@@ -18,7 +19,7 @@ class Register(object):
     }
 
 
-    def __init__(self, username, password, term, crns,):
+    def __init__(self, username, password, term, crns):
         self.username = username
         self.password = password
         self.term = term
@@ -79,16 +80,22 @@ class SearchForOpenSpot(object):
         'search_page' : '/search?',
     }
 
-    def __init__(self, term, SearchCRNS):
+    def __init__(self, term, SearchCRNS, targetEmail, register = False):
         self.searchCRNS = SearchCRNS
         self.base_url = "https://courselist.wm.edu/courselist/courseinfo"
         self.term = term
         self.successfulCRNS = []
+        self.targetEmail = targetEmail
+        self.register = register
 
         browser = webdriver.Firefox()
-        for i in range(10):
-            sleep(60)
+        while True:
+            now = datetime.now()
+            print("Time =", now.strftime("%H:%M:%S"))
             self.__search_for_open_spots__(browser)
+            print("\n")
+            sleep(60)
+
             
     def __search_for_open_spots__(self, browser):
         for i in range(0,len(self.searchCRNS)):
@@ -100,17 +107,24 @@ class SearchForOpenSpot(object):
             self.__select_subject__(browser, self.searchCRNS[i].split(' ', 1)[0])
 
             #Finding availaible spots
-            print("Searching for spots in: " + self.searchCRNS[i])
             browser.find_element(By.ID, "search").click()
             xpath = "//*[contains(text(),'" + self.searchCRNS[i] + "')]/../td[10]"
 
             #Checking if there is an open spot
             if int(browser.find_element(By.XPATH, xpath).text.replace("*", "")) > 1:
-                print("There is an open spot in " + self.searchCRNS[i])
+                print("\033[92m" + self.searchCRNS[i] + " is open" + "\033[0m")
+                #say(self.searchCRNS[i] + " is open") 
+                send_email(self.searchCRNS[i] + " is open", self.targetEmail)
+
                 self.successfulCRNS.append(self.searchCRNS[i])
+                if self.register == True:
+                    Register("jhe10@wm.edu", "password", "Fall 2023", self.successfulCRNS[i])
+                    send_email(self.searchCRNS[i] + " has been registered")
+
+                
                 self.searchCRNS.remove(self.searchCRNS[i])
             else:
-                print("There is no open spot in " + self.searchCRNS[i])
+                print(self.searchCRNS[i] + " is not open")
 
     def __homepage__(self, browser):
         #Gets to the homepage
@@ -127,10 +141,16 @@ class SearchForOpenSpot(object):
         select.select_by_value(subject)
 
 
+def say(msg = "Finish", voice = "Samantha"):
+    os.system(f'say -v {voice} {msg}')
 
-
-CRNS = ['17846', '10395', '17894', '17888', '10255']
+def send_email(body, targetEmail):
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.starttls()
+    server.login("developmentemail7@gmail.com", "sqyzsosyguwtgeop")
+    server.sendmail("developmentemail7@gmail.com", targetEmail, body)
+    server.quit()
 
 SearchCRNS = ['GEOL 203 01', 'SOCL 304 01']
 
-reg = SearchForOpenSpot('Fall 2023', SearchCRNS)
+reg = SearchForOpenSpot('Fall 2023', SearchCRNS, "james.he2004@gmail.com")
